@@ -1,4 +1,13 @@
 #include "header.h"
+#include <cstring>
+#include <fstream>
+#include <pwd.h>
+#include <sstream>
+#include <unistd.h>
+
+#include <fstream>
+#include <string>
+#include <sstream>
 
 // get cpu id and information, you can use `proc/cpuinfo`
 string CPUinfo()
@@ -107,4 +116,40 @@ int getTotalProcessCount() {
     int total = 0;
     for (const auto& pair : states) total += pair.second; // pair.first is the process state e.g 'R' while pair.second is the number of processes
     return total;
+}
+
+
+
+// getCPUTemperature retrieves the current CPU temp on a Linux system using several
+// different methods. If one method fails it tries a different one. It is designed to
+// be compatible with different hardware vendors and kernel configurations.
+float getCPUTemperature() {
+    // Method 1: Try to find coretemp in hwmon devices. hwmon dir contains hardware monitor devices.
+    DIR* hwmonDir = opendir("/sys/class/hwmon"); 
+    if (hwmonDir) {
+        struct dirent* entry;
+        while ((entry = readdir(hwmonDir)) != nullptr) {
+            if (entry->d_type == DT_LNK || entry->d_type == DT_DIR) { //ensure only link directories are read
+                if (strncmp(entry->d_name, "hwmon", 5) == 0) {
+                    std::string namePath = "/sys/class/hwmon/" + std::string(entry->d_name) + "/name";
+                    std::ifstream nameFile(namePath);
+                    std::string name;
+                    if (nameFile.is_open() && std::getline(nameFile, name)) {
+                        if (name == "coretemp") {
+                            // Found coretemp, read Package id 0 temperature
+                            std::string tempPath = "/sys/class/hwmon/" + std::string(entry->d_name) + "/temp1_input";
+                            std::ifstream tempFile(tempPath);
+                            int temp;
+                            if (tempFile.is_open() && (tempFile >> temp)) {
+                                closedir(hwmonDir);
+                                return temp / 1000.0f; // Convert from millidegrees to degrees celsius
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        closedir(hwmonDir);
+    }
+
 }
