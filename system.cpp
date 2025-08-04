@@ -51,10 +51,10 @@ const char *getOsName()
 }
 
 string getCurrentUsername() {
-    uid_t uid = getuid();
-    struct passwd *pw = getpwuid(uid);
-    if (pw) return pw->pw_name;
-    const char* user = getenv("USER");
+    uid_t uid = getuid(); // get the user id
+    struct passwd *pw = getpwuid(uid); 
+    if (pw) return pw->pw_name; // if the uid returned a password struct extract the username
+    const char* user = getenv("USER"); // if getpwuid failed, try to get the username from the environment
     if (user) return user;
     return "Unknown";
 }
@@ -62,8 +62,8 @@ string getCurrentUsername() {
 // get the name of the host machine
 string getHostname() {
     char hostname[HOST_NAME_MAX];
-    if (gethostname(hostname, sizeof(hostname)) == 0) {
-        hostname[HOST_NAME_MAX-1] = '\0';
+    if (gethostname(hostname, sizeof(hostname)) == 0) { //use sizeof(hostname) to avoid buffer overflow
+        hostname[HOST_NAME_MAX-1] = '\0'; // ensure null termination
         return string(hostname);
     }
     return "Unknown";
