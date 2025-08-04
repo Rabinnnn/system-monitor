@@ -68,3 +68,43 @@ string getHostname() {
     }
     return "Unknown";
 }
+
+// countProcessStates returns a map of process states e.g Running, sleeping, 
+// zombie etc and their counts. It gets the info from /proc which is a directory
+// containin process info
+map<char, int> countProcessStates() {
+    map<char, int> processStates;
+    DIR *dir = opendir("/proc"); 
+    if (!dir) return processStates;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != nullptr) { // iterate over each entry in the /proc directory
+        // Check if the directory name is numeric (PID)
+        if (isdigit(entry->d_name[0])) {
+            string statPath = "/proc/" + string(entry->d_name) + "/stat";
+            ifstream statFile(statPath); // open file using input file stream
+            if (statFile.is_open()) {
+                string fullStat;
+                getline(statFile, fullStat); //read entire line of the file
+                size_t statePos = fullStat.find_last_of(")");
+                if (statePos != string::npos && statePos + 2 < fullStat.length()) {
+                    char state = fullStat[statePos + 2]; // extract the process state character
+                    // Map 'I' (idle) to 'S' (sleeping) to match top's behavior
+                    if (state == 'I') state = 'S';
+                    processStates[state]++;
+                }
+                statFile.close();
+            }
+        }
+    }
+    closedir(dir);
+    return processStates;
+}  
+
+// returns the total number of processes found
+int getTotalProcessCount() {
+    map<char, int> states = countProcessStates();
+    int total = 0;
+    for (const auto& pair : states) total += pair.second; // pair.first is the process state e.g 'R' while pair.second is the number of processes
+    return total;
+}
