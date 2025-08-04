@@ -49,3 +49,22 @@ const char *getOsName()
     return "Other";
 #endif
 }
+
+string getCurrentUsername() {
+    uid_t uid = getuid();
+    struct passwd *pw = getpwuid(uid);
+    if (pw) return pw->pw_name;
+    const char* user = getenv("USER");
+    if (user) return user;
+    return "Unknown";
+}
+
+// get the name of the host machine
+string getHostname() {
+    char hostname[HOST_NAME_MAX];
+    if (gethostname(hostname, sizeof(hostname)) == 0) {
+        hostname[HOST_NAME_MAX-1] = '\0';
+        return string(hostname);
+    }
+    return "Unknown";
+}
