@@ -152,4 +152,14 @@ float getCPUTemperature() {
         closedir(hwmonDir);
     }
 
+
+    // Method 2: Try x86_pkg_temp thermal zone
+    std::ifstream pkgTempFile("/sys/class/thermal/thermal_zone14/temp");
+    if (pkgTempFile.is_open()) {
+        int temp;
+        if (pkgTempFile >> temp) {
+            return temp / 1000.0f; // Convert from millidegrees to degrees
+        }
+    }
+
 }
