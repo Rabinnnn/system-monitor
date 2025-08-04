@@ -162,4 +162,52 @@ float getCPUTemperature() {
         }
     }
 
+      // Method 3: Try to find any CPU-related thermal zone
+    DIR* thermalDir = opendir("/sys/class/thermal");
+    if (thermalDir) {
+        struct dirent* entry;
+        while ((entry = readdir(thermalDir)) != nullptr) {
+            if (strncmp(entry->d_name, "thermal_zone", 12) == 0) {
+                std::string typePath = "/sys/class/thermal/" + std::string(entry->d_name) + "/type"; //check the sensor type
+                std::ifstream typeFile(typePath);
+                std::string type;
+                if (typeFile.is_open() && std::getline(typeFile, type)) {
+                    // Look for CPU-related thermal zones
+                    if (type.find("x86") != std::string::npos || //npos represents not found
+                        type.find("cpu") != std::string::npos ||
+                        type.find("CPU") != std::string::npos ||
+                        type.find("processor") != std::string::npos) {
+                        std::string tempPath = "/sys/class/thermal/" + std::string(entry->d_name) + "/temp";
+                        std::ifstream tempFile(tempPath);
+                        int temp;
+                        if (tempFile.is_open() && (tempFile >> temp)) {
+                            closedir(thermalDir);
+                            return temp / 1000.0f; // Convert from millidegrees to degrees
+                        }
+                    }
+                }
+            }
+        }
+        closedir(thermalDir);
+    }
+
+     // Method 4: ThinkPad-specific method (fallback)
+    std::ifstream thinkpadTempFile("/proc/acpi/ibm/thermal");
+    if (thinkpadTempFile.is_open()) {
+        std::string line;
+        if (getline(thinkpadTempFile, line)) {
+            // Parse the temperatures line
+            // Format is "temperatures: 50 -128 0 0 39 0 0 -128"
+            if (line.find("temperatures:") != std::string::npos) {
+                std::istringstream iss(line.substr(line.find(":") + 1));
+                int temp;
+                iss >> temp; // Read the first temperature value
+                return temp; // Already in degrees C, no need to divide by 1000
+            }
+        }
+    }
+
+    // default value to be returned if all methods fail
+    return 0.0f;
+
 }
