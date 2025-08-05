@@ -265,3 +265,37 @@ Networks::~Networks() {
 
 // Constructor for CPUUsageTracker class
 CPUUsageTracker::CPUUsageTracker() : lastStats{0}, currentUsage(0.0f) {}
+
+// Calculate and return the current CPU usage percentage as a float
+float CPUUsageTracker::calculateCPUUsage() {
+    ifstream statFile("/proc/stat");
+    string line;
+    getline(statFile, line);
+
+    CPUStats current;
+    sscanf(line.c_str(), "cpu %lld %lld %lld %lld %lld %lld %lld %lld %lld %lld",
+           &current.user, &current.nice, &current.system,
+           &current.idle, &current.iowait, &current.irq,
+           &current.softirq, &current.steal, &current.guest,
+           &current.guestNice);
+
+    // compute total CPU time recorded in previous snapshot (excluding guest and guestNice)
+    long long prevTotal = lastStats.user + lastStats.nice + lastStats.system +
+                          lastStats.idle + lastStats.iowait + lastStats.irq +
+                          lastStats.softirq + lastStats.steal;
+    
+    // compute the current total cpu time
+    long long currentTotal = current.user + current.nice + current.system +
+                             current.idle + current.iowait + current.irq +
+                             current.softirq + current.steal;
+
+    // calculate the difference in total time and idle time
+    long long totalDiff = currentTotal - prevTotal;
+    long long idleDiff = current.idle - lastStats.idle;
+
+    if (totalDiff > 0) {
+        currentUsage = 100.0f * (totalDiff - idleDiff) / totalDiff; // get the percentage of time the CPU was active
+    }
+    lastStats = current;
+    return currentUsage;
+}
