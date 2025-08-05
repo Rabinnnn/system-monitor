@@ -257,3 +257,11 @@ float getFanSpeed() {
     // If all methods fail, return 0
     return 0.0f;
 }
+
+// Destructor for class Networks
+Networks::~Networks() {
+    for (auto& ip : ip4s) free(ip.name); // free memory allocated for ip.name
+}
+
+// Constructor for CPUUsageTracker class
+CPUUsageTracker::CPUUsageTracker() : lastStats{0}, currentUsage(0.0f) {}
