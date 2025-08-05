@@ -211,3 +211,49 @@ float getCPUTemperature() {
     return 0.0f;
 
 }
+
+float getFanSpeed() {
+    // Method 1: Try to find fan speed in hwmon devices
+    DIR* hwmonDir = opendir("/sys/class/hwmon");
+    if (hwmonDir) {
+        struct dirent* entry;
+        while ((entry = readdir(hwmonDir)) != nullptr) {
+            if (entry->d_type == DT_LNK || entry->d_type == DT_DIR) {
+                if (strncmp(entry->d_name, "hwmon", 5) == 0) {
+                    // Check for fan1_input or similar files
+                    std::string fanPath = "/sys/class/hwmon/" + std::string(entry->d_name) + "/fan1_input";
+                    std::ifstream fanFile(fanPath);
+                    int speed;
+                    if (fanFile.is_open() && (fanFile >> speed)) {
+                        closedir(hwmonDir);
+                        return static_cast<float>(speed);
+                    }
+                }
+            }
+        }
+        closedir(hwmonDir);
+    }
+
+    // Method 2: Try HP-specific fan information (To Do)
+    // HP laptops might have fan information in different locations
+    // Research the specific paths for HP EliteBook
+
+    // Method 3: ThinkPad-specific method (fallback)
+    std::ifstream thinkpadFanFile("/proc/acpi/ibm/fan");
+    if (thinkpadFanFile.is_open()) {
+        std::string line;
+        while (getline(thinkpadFanFile, line)) {
+            // Look for the line that starts with "speed:"
+            // Format is "speed:      2814"
+            if (line.find("speed:") != std::string::npos) {
+                std::istringstream iss(line.substr(line.find(":") + 1));
+                float speed;
+                iss >> speed;
+                return speed;
+            }
+        }
+    }
+
+    // If all methods fail, return 0
+    return 0.0f;
+}
