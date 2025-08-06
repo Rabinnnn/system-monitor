@@ -20,3 +20,30 @@ string formatNetworkBytes(long long bytes) {
     snprintf(buffer, sizeof(buffer), "%.2f %s", value, units[unitIndex]);
     return string(buffer);
 }
+
+// Function that retrieves IPV4 network interfaces
+Networks NetworkTracker::getNetworkInterfaces() {
+    Networks nets;
+    struct ifaddrs *ifap, *ifa; // ifap holds the start of the linked list
+                                // of interfaces while ifa is an iterator for traversing the list.
+    
+    if (getifaddrs(&ifap) == -1) { // getifaddrs populates ifap with a linked list of network interfaces. If it fails return the empty nets
+        return nets;
+    }
+
+    for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) { // Check if the interface has an IPv4 address
+            struct sockaddr_in *addr = (struct sockaddr_in*)ifa->ifa_addr;
+            
+            // extract the IPv4 address and name
+            IP4 interface;
+            interface.name = strdup(ifa->ifa_name);
+            inet_ntop(AF_INET, &(addr->sin_addr), interface.addressBuffer, INET_ADDRSTRLEN);
+            
+            nets.ip4s.push_back(interface); // add the interface to the list of IPv4 interfaces
+        }
+    }
+
+    freeifaddrs(ifap); // free the memory allocated by getifaddrs
+    return nets;
+}
