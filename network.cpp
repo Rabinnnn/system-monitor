@@ -78,3 +78,35 @@ map<string, RX> NetworkTracker::getNetworkRX() {
     netDevFile.close();
     return rxStats;
 }
+
+// Function that reads the file /proc/net/dev to extract transmit (TX) statistics
+// for each network interface and returns them as a map
+map<string, TX> NetworkTracker::getNetworkTX() {
+    map<string, TX> txStats;
+    ifstream netDevFile("/proc/net/dev");
+    string line;
+    
+    getline(netDevFile, line); // Skip header line
+    getline(netDevFile, line); // Skip second header line
+
+    while (getline(netDevFile, line)) {
+        istringstream iss(line);
+        string interfaceName;
+        getline(iss, interfaceName, ':');
+        interfaceName = interfaceName.substr(interfaceName.find_first_not_of(" \t"));
+        
+        long long rxDummy;
+        for (int i = 0; i < 8; ++i) { // TX stats appear after the first 8 RX values. In this loop, We read and discard the RX values
+            iss >> rxDummy;
+        }
+        
+        TX tx;
+        iss >> tx.bytes >> tx.packets >> tx.errs >> tx.drop 
+            >> tx.fifo >> tx.colls >> tx.carrier >> tx.compressed;
+        
+        txStats[interfaceName] = tx;
+    }
+
+    netDevFile.close();
+    return txStats;
+}
