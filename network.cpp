@@ -47,3 +47,34 @@ Networks NetworkTracker::getNetworkInterfaces() {
     freeifaddrs(ifap); // free the memory allocated by getifaddrs
     return nets;
 }
+
+// Function that reads network receive (RX) statistics from /proc/net/dev and
+// returns them in a map<string, RX>, where each key is a network interface name (e.g "eth0" or "wlan0")
+// and each value is an RX struct holding the stats.
+// The purpose of the function is to parse and extract network receive statistics (e.g number of bytes and packets)
+// for each network interface.
+map<string, RX> NetworkTracker::getNetworkRX() {
+    map<string, RX> rxStats;
+    ifstream netDevFile("/proc/net/dev");
+    string line;
+    
+    getline(netDevFile, line); // Skip header line
+    getline(netDevFile, line); // Skip second header line
+
+    while (getline(netDevFile, line)) {
+        istringstream iss(line);
+        string interfaceName;
+        getline(iss, interfaceName, ':'); // read characters from iss(the line) up to the colon : and stores them in interfaceName
+        interfaceName = interfaceName.substr(interfaceName.find_first_not_of(" \t")); // remove any leading spaces or tabs from the interface name
+        
+        RX rx;
+        // extract numbers from the rest of the line
+        iss >> rx.bytes >> rx.packets >> rx.errs >> rx.drop 
+            >> rx.fifo >> rx.frame >> rx.compressed >> rx.multicast;
+        
+        rxStats[interfaceName] = rx; // store the parsed stats into the map using the interface name as the key
+    }
+
+    netDevFile.close();
+    return rxStats;
+}
