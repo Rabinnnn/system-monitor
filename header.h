@@ -70,6 +70,8 @@ struct IP4
 struct Networks
 {
     vector<IP4> ip4s;
+    ~Networks();
+
 };
 
 struct TX
@@ -103,5 +105,79 @@ const char *getOsName();
 // student TODO : memory and processes
 
 // student TODO : network
+
+
+struct MemoryInfo {
+    float total_ram;   // Total RAM in GB
+    float used_ram;    // Used RAM in GB
+    float ram_percent; // Percentage of RAM used
+    float total_swap;  // Total swap in GB
+    float used_swap;   // Used swap in GB
+    float swap_percent; // Percentage of swap used
+};
+
+
+struct DiskInfo {
+    float total_space;   // Total disk space in GB
+    float used_space;    // Used disk space in GB
+    float usage_percent; // Percentage of disk used
+};
+
+class SystemResourceTracker {
+public:
+    MemoryInfo getMemoryInfo();
+    DiskInfo getDiskInfo();
+    vector<Proc> getProcessList();
+};
+
+class CPUUsageTracker {
+private:
+    CPUStats lastStats;
+    float currentUsage;
+
+public:
+    CPUUsageTracker();
+    float calculateCPUUsage();
+    float getCurrentUsage();
+};
+
+class ProcessUsageTracker {
+    private:
+        map<int, pair<long long, long long>> lastProcessCPUTime;
+        float deltaTime;
+        float updateInterval;
+        float lastUpdateTime;
+        map<int, float> cpuUsageCache;
+    
+    public:
+        ProcessUsageTracker();
+        float calculateProcessCPUUsage(const Proc& process, float currentTime); // No change needed, just context
+        void updateDeltaTime(float dt);
+    };
+
+class NetworkTracker {
+public:
+    Networks getNetworkInterfaces();
+    map<string, RX> getNetworkRX();
+    map<string, TX> getNetworkTX();
+};
+
+// System functions
+string CPUinfo();
+const char* getOsName();
+string getCurrentUsername();
+string getHostname();
+map<char, int> countProcessStates();
+int getTotalProcessCount();
+float getCPUTemperature();
+float getFanSpeed();
+string formatNetworkBytes(long long bytes);
+
+template<typename... Args>
+string TextF(const char* fmt, Args... args) {
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), fmt, args...);
+    return string(buffer);
+}
 
 #endif
