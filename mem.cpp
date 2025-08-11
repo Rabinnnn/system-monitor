@@ -58,3 +58,59 @@ DiskInfo SystemResourceTracker::getDiskInfo() {
 
     return disk;
 }
+
+// Function that reads and returns a list of all running processes on a Linux system
+vector<Proc> SystemResourceTracker::getProcessList() {
+    vector<Proc> processes;
+    DIR *dir = opendir("/proc");
+    if (!dir) return processes;
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        // check if entry is a directory and its name starts with a digit
+        if (entry->d_type == DT_DIR && isdigit(entry->d_name[0])) {
+            string pid = entry->d_name;
+            string statPath = "/proc/" + pid + "/stat";
+            ifstream statFile(statPath);
+
+            if (statFile.is_open()) {
+                Proc process;
+                process.pid = stoi(pid); //parse pid string to an integer
+
+                string line;
+                getline(statFile, line);
+
+                size_t nameStart = line.find('(');
+                size_t nameEnd = line.rfind(')');
+
+                // extracts the process name between the parentheses
+                if (nameStart != string::npos && nameEnd != string::npos) {
+                    process.name = line.substr(nameStart + 1, nameEnd - nameStart - 1);
+
+                    // create an input string stream from the remainder of the line after the closing parenthesis
+                    istringstream iss(line.substr(nameEnd + 1));
+                    string field; // variable for temporarily holding each extracted word/token
+                    vector<string> fields;
+
+                    while (iss >> field) {
+                        fields.push_back(field);
+                    }
+
+                    if (fields.size() >= 24) {
+                        process.state = fields[0][0];
+                        process.vsize = stoll(fields[20]); //virtual memory size
+                        process.rss = stoll(fields[21]); // resident set size
+                        process.utime = stoll(fields[11]); // user mode CPU time
+                        process.stime = stoll(fields[12]); // kernel mode CPU time
+                    }
+
+                    processes.push_back(process);
+                }
+                statFile.close();
+            }
+        }
+    }
+
+    closedir(dir);
+    return processes;
+}
