@@ -44,3 +44,17 @@ MemoryInfo SystemResourceTracker::getMemoryInfo() {
 
     return mem;
 }
+
+// This is a method of the SystemResourceTracer class.
+// It returns  disk information struct containing total_space, used_space, usage_percent
+DiskInfo SystemResourceTracker::getDiskInfo() {
+    struct statvfs stat;
+    statvfs("/", &stat);
+
+    DiskInfo disk;
+    disk.total_space = stat.f_blocks * stat.f_frsize / (1024 * 1024 * 1024);
+    disk.used_space = (stat.f_blocks - stat.f_bfree) * stat.f_frsize / (1024 * 1024 * 1024);
+    disk.usage_percent = (float)disk.used_space / disk.total_space * 100.0f;
+
+    return disk;
+}
