@@ -133,6 +133,7 @@ void systemWindow(const char* id, ImVec2 size, ImVec2 position) {
 
     // start tab for CPU, Fan, and Thermal
     if (ImGui::BeginTabBar("SystemPerformanceTabs")) {
+       // display CPU data 
        if (ImGui::BeginTabItem("CPU")) {
         static bool pauseGraph = false;
         static float graphFPS = 30.0f;
@@ -169,4 +170,44 @@ void systemWindow(const char* id, ImVec2 size, ImVec2 position) {
                         0.0f, graphYScale, ImVec2(0, 80));
         ImGui::EndTabItem();
     }
+
+    // display fan data
+    if (ImGui::BeginTabItem("Fan")) {
+            static bool pauseGraph = false;
+            static float graphFPS = 30.0f;
+            static float graphYScale = 5000.0f;
+            static vector<float> fanSpeedHistory(100, 0.0f);
+            float fanSpeed = getFanSpeed();
+            bool fanAvailable = fanSpeed > 0;
+
+            if (!pauseGraph) {
+                float updateInterval = 1.0f / graphFPS;
+                fanUpdateTime += io.DeltaTime;
+                if (fanUpdateTime >= updateInterval) {
+                    fanSpeedHistory.erase(fanSpeedHistory.begin());
+                    fanSpeedHistory.push_back(fanSpeed);
+                    fanUpdateTime = 0.0f;
+                }
+            }
+
+            ImGui::Checkbox("Pause Graph", &pauseGraph);
+            ImGui::SliderFloat("Graph FPS", &graphFPS, 1.0f, 60.0f);
+            ImGui::SliderFloat("Y-Scale", &graphYScale, 1000.0f, 10000.0f);
+
+            if (fanAvailable) {
+                ImGui::Text("Fan Status: Active");
+                ImGui::Text("Fan Speed: %.0f RPM", fanSpeed);
+                ImGui::Text("Fan Level: %s",
+                            fanSpeed < 1000 ? "Low" : fanSpeed < 3000 ? "Medium" : "High");
+
+                ImGui::PlotLines("Fan Speed", fanSpeedHistory.data(), fanSpeedHistory.size(),
+                                0, TextF("%.0f RPM", fanSpeed).c_str(),
+                                0.0f, graphYScale, ImVec2(0, 80));
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Fan information not available on this system");
+                ImGui::Text("Fan monitoring is supported on some ThinkPad models and");
+                ImGui::Text("other systems with accessible fan sensors.");
+            }
+            ImGui::EndTabItem();
+        }
 }
