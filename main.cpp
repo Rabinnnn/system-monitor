@@ -131,4 +131,42 @@ void systemWindow(const char* id, ImVec2 size, ImVec2 position) {
     }
     ImGui::EndChild();
 
+    // start tab for CPU, Fan, and Thermal
+    if (ImGui::BeginTabBar("SystemPerformanceTabs")) {
+       if (ImGui::BeginTabItem("CPU")) {
+        static bool pauseGraph = false;
+        static float graphFPS = 30.0f;
+        static float graphYScale = 100.0f;
+        float currentCPUUsage = cpuTracker.calculateCPUUsage();
+
+        // Add moving average calculation
+        cpuUsageBuffer[bufferIndex] = currentCPUUsage;
+        bufferIndex = (bufferIndex + 1) % cpuUsageBuffer.size();
+
+        // calculate average CPU usage over last N readings
+        float smoothedCPUUsage = 0.0f;
+        for (float usage : cpuUsageBuffer) {
+            smoothedCPUUsage += usage;
+        }
+        smoothedCPUUsage /= cpuUsageBuffer.size();
+
+        if (!pauseGraph) {
+            float updateInterval = 1.0f / graphFPS;
+            cpuUpdateTime += io.DeltaTime;
+            if (cpuUpdateTime >= updateInterval) {
+                cpuUsageHistory.erase(cpuUsageHistory.begin());
+                cpuUsageHistory.push_back(smoothedCPUUsage);  // Use smoothed value
+                cpuUpdateTime = 0.0f;
+            }
+        }
+
+        ImGui::Checkbox("Pause Graph", &pauseGraph);
+        ImGui::SliderFloat("Graph FPS", &graphFPS, 1.0f, 60.0f);
+        ImGui::SliderFloat("Y-Scale", &graphYScale, 10.0f, 200.0f);
+
+        ImGui::PlotLines("CPU Usage", cpuUsageHistory.data(), cpuUsageHistory.size(),
+                        0, TextF("CPU: %.1f%%", smoothedCPUUsage).c_str(),  // Use smoothed value
+                        0.0f, graphYScale, ImVec2(0, 80));
+        ImGui::EndTabItem();
+    }
 }
