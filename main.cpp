@@ -56,3 +56,36 @@ struct NetworkRate {
         }
     }
 };
+
+
+static CPUUsageTracker cpuTracker;
+static ProcessUsageTracker processTracker;
+static vector<float> cpuUsageHistory(100, 0.0f);
+static vector<float> temperatureHistory(100, 0.0f);
+static NetworkRate rateTracker;
+static vector<float> cpuUsageBuffer(5, 0.0f);  // Buffer for last 5 readings
+static int bufferIndex = 0;
+
+// Timing variables for graph updates
+static float cpuUpdateTime = 0.0f;
+static float fanUpdateTime = 0.0f;
+static float thermalUpdateTime = 0.0f;
+
+// system monitoring UI function with tabs for CPU, Fan, and Thermal info, plus system metadata.
+// id is unique identifier for the window, size refers to the window size in pixels, while position
+// refers to window position on the screen.
+void systemWindow(const char* id, ImVec2 size, ImVec2 position) {
+    ImGuiIO& io = ImGui::GetIO(); // get reference to ImGui's IO interface
+    ImGui::Begin(id);
+    ImGui::SetWindowSize(size);
+    ImGui::SetWindowPos(position);
+
+    ImGui::BeginChild("SystemInfo", ImVec2(0, 150), true); // create a child window(scrollable sub-section)
+    ImGui::Text("Operating System: %s", getOsName());
+    ImGui::Text("Username: %s", getCurrentUsername().c_str());
+    ImGui::Text("Hostname: %s", getHostname().c_str());
+    ImGui::Text("Total Processes: %d", getTotalProcessCount());
+    ImGui::Text("CPU Type: %s", CPUinfo().c_str());
+
+
+}
