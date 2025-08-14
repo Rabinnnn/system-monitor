@@ -87,5 +87,48 @@ void systemWindow(const char* id, ImVec2 size, ImVec2 position) {
     ImGui::Text("Total Processes: %d", getTotalProcessCount());
     ImGui::Text("CPU Type: %s", CPUinfo().c_str());
 
+    static auto lastUpdateTime = std::chrono::steady_clock::now(); // last time process states were updated
+    static std::map<char, int> cachedStates; // count of processes per state (e.g Running, Sleeping etc)
+    
+    //update process state counts only once per second
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::seconds>(now - lastUpdateTime).count() >= 1) {
+        cachedStates = countProcessStates();
+        lastUpdateTime = now;
+    }
+    
+    ImGui::Text("Process States:");
+    // Define known states with their labels
+    const vector<pair<char, string>> stateLabels = {
+        {'R', "Running"},
+        {'S', "Sleeping"},
+        {'D', "Uninterruptible Sleep"},
+        {'Z', "Zombie"},
+        {'T', "Stopped"},
+        {'I', "Idle"}
+    };
+    
+    int totalProcesses = 0;
+    for (const auto& [state, count] : cachedStates) {
+        totalProcesses += count;
+    }
+    ImGui::Text("  Total Processes: %d", totalProcesses);
+
+    // Display known states first
+    for (const auto& [code, label] : stateLabels) {
+        if (cachedStates.count(code)) {
+            ImGui::Text("  %s: %d", label.c_str(), cachedStates.at(code));
+        }
+    }
+    
+    // Display any unknown states
+    for (const auto& [state, count] : cachedStates) {
+        bool isKnown = any_of(stateLabels.begin(), stateLabels.end(),
+                            [state](const auto& pair) { return pair.first == state; });
+        if (!isKnown) {
+            ImGui::Text("  Unknown State (%c): %d", state, count);
+        }
+    }
+    ImGui::EndChild();
 
 }
