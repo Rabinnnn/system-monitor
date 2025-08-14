@@ -210,4 +210,53 @@ void systemWindow(const char* id, ImVec2 size, ImVec2 position) {
             }
             ImGui::EndTabItem();
         }
+
+        // display thermal data
+        if (ImGui::BeginTabItem("Thermal")) {
+            static bool pauseGraph = false;
+            static float graphFPS = 30.0f;
+            static float graphYScale = 100.0f;
+            float temperature = getCPUTemperature();
+            bool tempAvailable = temperature > 0.1f; // Small threshold to detect valid readings
+
+            if (!pauseGraph) {
+                float updateInterval = 1.0f / graphFPS;
+                thermalUpdateTime += io.DeltaTime;
+                if (thermalUpdateTime >= updateInterval) {
+                    temperatureHistory.erase(temperatureHistory.begin());
+                    temperatureHistory.push_back(temperature);
+                    thermalUpdateTime = 0.0f;
+                }
+            }
+
+            ImGui::Checkbox("Pause Graph", &pauseGraph);
+            ImGui::SliderFloat("Graph FPS", &graphFPS, 1.0f, 60.0f);
+            ImGui::SliderFloat("Y-Scale", &graphYScale, 10.0f, 200.0f);
+
+            if (tempAvailable) {
+                ImGui::Text("Current Temperature: %.1f°C", temperature);
+                ImGui::PlotLines("Temperature", temperatureHistory.data(), temperatureHistory.size(),
+                                0, TextF("Temp: %.1f°C", temperature).c_str(),
+                                0.0f, graphYScale, ImVec2(0, 80));
+
+                // Add temperature status indicator
+                if (temperature < 50.0f) {
+                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Temperature Status: Normal");
+                } else if (temperature < 70.0f) {
+                    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Temperature Status: Warm");
+                } else if (temperature < 85.0f) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Temperature Status: Hot");
+                } else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Temperature Status: Critical!");
+                }
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "Temperature information not available");
+                ImGui::Text("The system is using a hardware-agnostic approach to find");
+                ImGui::Text("temperature sensors. No compatible sensors were found.");
+            }
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
+    ImGui::End();
 }
