@@ -351,3 +351,120 @@ void memoryProcessesWindow(const char* id, ImVec2 size, ImVec2 position) {
     ImGui::Text("Selected processes: %zu", selectedPids.size());
     ImGui::End();
 }
+
+// display network interface information and stats in an ImGui window
+void networkWindow(const char* id, ImVec2 size, ImVec2 position) {
+    ImGui::Begin(id);
+    ImGui::SetWindowSize(size);
+    ImGui::SetWindowPos(position);
+
+    NetworkTracker networkTracker;
+    Networks interfaces = networkTracker.getNetworkInterfaces();
+    ImGui::Text("Network Interfaces:");
+    for (const auto& iface : interfaces.ip4s) {
+        ImGui::Text("%s: %s", iface.name, iface.addressBuffer);
+    }
+
+    // start tabbed interface
+    if (ImGui::BeginTabBar("NetworkTabs")) {
+        //create tab labeled RX(Receiver)
+        if (ImGui::BeginTabItem("RX (Receiver)")) {
+            map<string, RX> rxStats = networkTracker.getNetworkRX();
+            if (ImGui::BeginTable("RX Stats", 8, ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable)) {
+                ImGui::TableSetupColumn("Interface");
+                ImGui::TableSetupColumn("Bytes");
+                ImGui::TableSetupColumn("Packets");
+                ImGui::TableSetupColumn("Errs");
+                ImGui::TableSetupColumn("Drop");
+                ImGui::TableSetupColumn("FIFO");
+                ImGui::TableSetupColumn("Frame");
+                ImGui::TableSetupColumn("Compressed");
+                ImGui::TableHeadersRow();
+
+                for (const auto& [iface, rx] : rxStats) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); ImGui::Text("%s", iface.c_str());
+                    ImGui::TableNextColumn(); ImGui::Text("%s", formatNetworkBytes(rx.bytes).c_str());
+                    ImGui::TableNextColumn(); ImGui::Text("%d", rx.packets);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", rx.errs);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", rx.drop);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", rx.fifo);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", rx.frame);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", rx.compressed);
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("TX (Transmitter)")) {
+            map<string, TX> txStats = networkTracker.getNetworkTX();
+            if (ImGui::BeginTable("TX Stats", 8, ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable)) {
+                ImGui::TableSetupColumn("Interface");
+                ImGui::TableSetupColumn("Bytes");
+                ImGui::TableSetupColumn("Packets");
+                ImGui::TableSetupColumn("Errs");
+                ImGui::TableSetupColumn("Drop");
+                ImGui::TableSetupColumn("FIFO");
+                ImGui::TableSetupColumn("Colls");
+                ImGui::TableSetupColumn("Compressed");
+                ImGui::TableHeadersRow();
+
+                for (const auto& [iface, tx] : txStats) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); ImGui::Text("%s", iface.c_str());
+                    ImGui::TableNextColumn(); ImGui::Text("%s", formatNetworkBytes(tx.bytes).c_str());
+                    ImGui::TableNextColumn(); ImGui::Text("%d", tx.packets);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", tx.errs);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", tx.drop);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", tx.fifo);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", tx.colls);
+                    ImGui::TableNextColumn(); ImGui::Text("%d", tx.compressed);
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Network Usage")) {
+            static bool showRX = true, showTX = true;
+            ImGui::Checkbox("Show RX", &showRX);
+            ImGui::SameLine();
+            ImGui::Checkbox("Show TX", &showTX);
+
+            map<string, RX> rxStats = networkTracker.getNetworkRX();
+            map<string, TX> txStats = networkTracker.getNetworkTX();
+            rateTracker.update(networkTracker, ImGui::GetTime()); // Update rates
+
+            if (showRX) {
+                ImGui::Text("RX Network Usage:");
+                for (const auto& [iface, rx] : rxStats) {
+                    if (iface.find("lo") != string::npos) continue;
+                    float rate = rateTracker.rxRate[iface]; // Smoothed rate in bytes/sec
+                    float scaledRate = rate / (1024 * 1024); // Scale to MB/s for progress bar
+                    ImGui::Text("%s:", iface.c_str());
+                    ImGui::SameLine(150);
+                    // Cap the progress bar to a reasonable max value (e.g., 10 MB/s) to avoid overflow
+                    float maxRate = 10.0f; // Adjust based on your network's expected max bandwidth
+                    ImGui::ProgressBar(scaledRate / maxRate, ImVec2(-1, 0), formatNetworkBytes(rate).c_str());
+                }
+            }
+
+            if (showTX) {
+                ImGui::Text("TX Network Usage:");
+                for (const auto& [iface, tx] : txStats) {
+                    if (iface.find("lo") != string::npos) continue;
+                    float rate = rateTracker.txRate[iface]; // Smoothed rate in bytes/sec
+                    float scaledRate = rate / (1024 * 1024); // Scale to MB/s for progress bar
+                    ImGui::Text("%s:", iface.c_str());
+                    ImGui::SameLine(150);
+                    float maxRate = 10.0f; // Adjust based on your network's expected max bandwidth
+                    ImGui::ProgressBar(scaledRate / maxRate, ImVec2(-1, 0), formatNetworkBytes(rate).c_str());
+                }
+            }
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
+    ImGui::End();
+}
