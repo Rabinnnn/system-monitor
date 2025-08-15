@@ -1,6 +1,8 @@
 // To make sure you don't declare the function more than once by including the header multiple times.
 #ifndef header_H
 #define header_H
+#include <pwd.h>
+#include <numeric>
 
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
@@ -32,6 +34,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <map>
+#include <sstream>
+
 
 using namespace std;
 
@@ -74,7 +78,7 @@ struct Networks
 
 };
 
-struct TX
+struct RX
 {
     int bytes;
     int packets;
@@ -86,7 +90,7 @@ struct TX
     int multicast;
 };
 
-struct RX
+struct TX
 {
     int bytes;
     int packets;
@@ -98,13 +102,6 @@ struct RX
     int compressed;
 };
 
-// student TODO : system stats
-string CPUinfo();
-const char *getOsName();
-
-// student TODO : memory and processes
-
-// student TODO : network
 
 
 struct MemoryInfo {
