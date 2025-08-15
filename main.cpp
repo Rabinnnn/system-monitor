@@ -260,3 +260,94 @@ void systemWindow(const char* id, ImVec2 size, ImVec2 position) {
     }
     ImGui::End();
 }
+
+
+// display memory, disk, and process usage.
+// id is a unique identifier for ImGui window, size gives the desired dimensions of the window,
+// position represents the desired position of the window on the screen.
+void memoryProcessesWindow(const char* id, ImVec2 size, ImVec2 position) {
+    ImGuiIO& io = ImGui::GetIO();
+    processTracker.updateDeltaTime(io.DeltaTime); // tracks time elapsed since last frame
+    float currentTime = ImGui::GetTime();
+
+    ImGui::Begin(id);
+    ImGui::SetWindowSize(size);
+    ImGui::SetWindowPos(position);
+
+    SystemResourceTracker resourceTracker;
+    MemoryInfo memInfo = resourceTracker.getMemoryInfo(); 
+    DiskInfo diskInfo = resourceTracker.getDiskInfo();
+
+    ImGui::BeginChild("Memory Info", ImVec2(0, 150), true);
+    // Display RAM in GB with one decimal place
+    ImGui::Text("RAM Usage: %.1f GB / %.1f GB (%.2f%%)",
+                memInfo.used_ram, memInfo.total_ram, memInfo.ram_percent);
+    ImGui::ProgressBar(memInfo.ram_percent / 100.0f, ImVec2(0, 0),
+                       TextF("%.2f%%", memInfo.ram_percent).c_str());
+
+    // Display Swap in GB with one decimal place
+    ImGui::Text("Swap Usage: %.1f GB / %.1f GB (%.2f%%)",
+                memInfo.used_swap, memInfo.total_swap, memInfo.swap_percent);
+    ImGui::ProgressBar(memInfo.swap_percent / 100.0f, ImVec2(0, 0),
+                       TextF("%.2f%%", memInfo.swap_percent).c_str());
+
+    // Format disk usage with rounding to match 'df -h'
+    ImGui::Text("Disk Usage: %.1f GB / %.1f GB (%.2f%%)",
+                diskInfo.used_space, diskInfo.total_space, diskInfo.usage_percent);
+
+    // Progress bar with percentage label
+    ImGui::ProgressBar(diskInfo.usage_percent / 100.0f, ImVec2(0, 0),
+                    TextF("%.1f%%", diskInfo.usage_percent).c_str());
+    ImGui::EndChild();
+
+    static char processFilter[256] = ""; // buffer for user-typed filter text
+    ImGui::InputText("Filter Processes", processFilter, sizeof(processFilter));
+
+    vector<Proc> processes = resourceTracker.getProcessList();
+    static set<int> selectedPids;
+
+    if (ImGui::BeginTable("Processes", 5,
+                          ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable)) {
+        ImGui::TableSetupColumn("PID");
+        ImGui::TableSetupColumn("Name");
+        ImGui::TableSetupColumn("State");
+        ImGui::TableSetupColumn("CPU Usage");
+        ImGui::TableSetupColumn("Memory Usage");
+        ImGui::TableHeadersRow();
+
+        for (const auto& proc : processes) {
+            if (processFilter[0] != '\0' && strstr(proc.name.c_str(), processFilter) == nullptr)
+                continue; // if filter string is typed, skip processes whose name does not contain the filter
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            bool isSelected = selectedPids.count(proc.pid) > 0;
+            // create a selectable text element for the PID
+            // if Ctrl is held, toggle selection of this PID else select only this PID
+            if (ImGui::Selectable(TextF("%d", proc.pid).c_str(), isSelected, ImGuiSelectableFlags_SpanAllColumns)) {
+                if (ImGui::GetIO().KeyCtrl) {
+                    if (isSelected) selectedPids.erase(proc.pid);
+                    else selectedPids.insert(proc.pid);
+                } else {
+                    selectedPids.clear();
+                    selectedPids.insert(proc.pid);
+                }
+            }
+
+            ImGui::TableNextColumn(); ImGui::Text("%s", proc.name.c_str());
+            ImGui::TableNextColumn(); ImGui::Text("%c", proc.state);
+            ImGui::TableNextColumn();
+            float cpuUsage = processTracker.calculateProcessCPUUsage(proc, currentTime);
+            ImGui::Text("%.2f%%", cpuUsage);
+            ImGui::TableNextColumn();
+            // Convert vsize to GB for consistency
+            float memUsageGB = proc.vsize / (1024.0f * 1024.0f * 1024.0f);
+            float memPercent = (memInfo.total_ram > 0) ? (memUsageGB / memInfo.total_ram * 100.0f) : 0.0f;
+            ImGui::Text("%.2f%% (%.1f GB)", memPercent, memUsageGB);
+        }
+        ImGui::EndTable();
+    }
+
+    ImGui::Text("Selected processes: %zu", selectedPids.size());
+    ImGui::End();
+}
