@@ -468,3 +468,81 @@ void networkWindow(const char* id, ImVec2 size, ImVec2 position) {
     }
     ImGui::End();
 }
+
+int main(int, char**) {
+    //initialize SDL with video, timer, and game controller subsystems
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
+        printf("Error: %s\n", SDL_GetError());
+        return -1;
+    }
+
+    // OpenGL context configuration
+    const char* glsl_version = "#version 130";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1); // enable double buffering for smooth rendering without flickering
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+
+    // create am SDL window with the attributes given
+    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_Window* window = SDL_CreateWindow("System Monitor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+    SDL_GL_MakeCurrent(window, gl_context);
+    SDL_GL_SetSwapInterval(1);
+
+    if (gl3wInit() != 0) {
+        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+        return 1;
+    }
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplSDL2_InitForOpenGL(window, gl_context); // initialize ImGui SDL2 backend (event handling, input)
+    ImGui_ImplOpenGL3_Init(glsl_version); // initialize ImGui OpenGL3 backend (rendering using OpenGL)
+
+    ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); //set background color
+    bool done = false;
+
+    while (!done) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL2_ProcessEvent(&event);
+            if (event.type == SDL_QUIT || (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE))
+                done = true; // exit loop if quit event or window close event occurs
+        }
+
+        //start a new frame for ImGui
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL2_NewFrame(window);
+        ImGui::NewFrame();
+
+        ImVec2 mainDisplay = io.DisplaySize; //retrieve display size
+        // draw 3 custom UI windows
+        memoryProcessesWindow("== Memory and Processes ==", ImVec2((mainDisplay.x / 2) - 20, (mainDisplay.y / 2) + 30), ImVec2((mainDisplay.x / 2) + 10, 10));
+        systemWindow("== System ==", ImVec2((mainDisplay.x / 2) - 10, (mainDisplay.y / 2) + 30), ImVec2(10, 10));
+        networkWindow("== Network ==", ImVec2(mainDisplay.x - 20, (mainDisplay.y / 2) - 60), ImVec2(10, (mainDisplay.y / 2) + 50));
+
+        ImGui::Render();
+        glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y); // set OpenGL viewport to match the display size
+        glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w); // clear the screen to black
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); // render ImGui draw data
+        SDL_GL_SwapWindow(window); //swap buffers to display rendered frame
+    }
+
+    //cleanup
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+    SDL_GL_DeleteContext(gl_context);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+
+    return 0;
+}
