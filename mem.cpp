@@ -2,44 +2,57 @@
 #include <sys/sysinfo.h>
 #include <sys/statvfs.h>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <map>
+#include <dirent.h>
+#include <cctype>
+#include <cmath> // Include for std::round
 
 // Function that reads Linux system memory stats from /proc/meminfo and converts them
 // into a MemoryInfo struct.
 MemoryInfo SystemResourceTracker::getMemoryInfo() {
     MemoryInfo mem = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
-    // declare temporary variables that will hold raw values (in kB) read from /proc/meminfo
-    unsigned long memTotal = 0, memFree = 0;
-    unsigned long buffers = 0, cached = 0, sReclaimable = 0;
-    unsigned long swapTotal = 0, swapFree = 0;
-
-    std::ifstream meminfo("/proc/meminfo"); //open file for reading
+    // Use a unified map to store all values
+    std::map<std::string, unsigned long> memStats;
+    std::ifstream meminfo("/proc/meminfo");
     std::string line;
-    while (std::getline(meminfo, line)) { // read one line at a time into line until EOF
+
+    while (std::getline(meminfo, line)) {
         std::istringstream iss(line);
         std::string key;
         unsigned long value;
-        //split into key value pairs, extract the details assign the parsed value into corresponding temporary variable
         iss >> key >> value;
-        if (key == "MemTotal:") memTotal = value;
-        else if (key == "MemFree:") memFree = value;
-        else if (key == "Buffers:") buffers = value;
-        else if (key == "Cached:") cached = value;
-        else if (key == "SReclaimable:") sReclaimable = value;
-        else if (key == "SwapTotal:") swapTotal = value;
-        else if (key == "SwapFree:") swapFree = value;
+        // The colon is part of the key in /proc/meminfo
+        if (!key.empty()) {
+            key.pop_back(); // Remove the colon
+            memStats[key] = value;
+        }
     }
     meminfo.close();
 
-    // Calculate used memory as shown by 'free -h'
-    unsigned long usedMem = memTotal - memFree - buffers - (cached + sReclaimable);
+    unsigned long memTotal = memStats["MemTotal"];
+    unsigned long memAvailable = memStats["MemAvailable"];
+    unsigned long swapTotal = memStats["SwapTotal"];
+    unsigned long swapFree = memStats["SwapFree"];
 
-    mem.total_ram = memTotal / (1024.0f * 1024.0f); // KB to GB
-    mem.used_ram = usedMem / (1024.0f * 1024.0f);   // KB to GB
+    // Calculate used memory based on MemAvailable, matching 'free' command logic
+    unsigned long usedMem = memTotal - memAvailable;
+
+    // Convert from KB to GiB (1 GiB = 1024^3 bytes)
+    mem.total_ram = static_cast<float>(memTotal) / (1024.0f * 1024.0f); 
+    mem.used_ram = static_cast<float>(usedMem) / (1024.0f * 1024.0f);   
+
+    // Round the total_ram value to match 'free -h' output
+    mem.total_ram = std::round(mem.total_ram);
+
     mem.ram_percent = (mem.total_ram > 0) ? (mem.used_ram / mem.total_ram * 100.0f) : 0.0f;
 
-    mem.total_swap = swapTotal / (1024.0f * 1024.0f);
-    mem.used_swap = (swapTotal - swapFree) / (1024.0f * 1024.0f);
+    mem.total_swap = static_cast<float>(swapTotal) / (1024.0f * 1024.0f);
+    mem.used_swap = static_cast<float>(swapTotal - swapFree) / (1024.0f * 1024.0f);
     mem.swap_percent = (mem.total_swap > 0) ? (mem.used_swap / mem.total_swap * 100.0f) : 0.0f;
 
     return mem;
@@ -52,45 +65,49 @@ DiskInfo SystemResourceTracker::getDiskInfo() {
     statvfs("/", &stat);
 
     DiskInfo disk;
-    disk.total_space = stat.f_blocks * stat.f_frsize / (1024 * 1024 * 1024);
-    disk.used_space = (stat.f_blocks - stat.f_bfree) * stat.f_frsize / (1024 * 1024 * 1024);
-    disk.usage_percent = (float)disk.used_space / disk.total_space * 100.0f;
+    disk.total_space = static_cast<float>(stat.f_blocks) * stat.f_frsize / (1024.0f * 1024.0f * 1024.0f);
+    disk.used_space = static_cast<float>(stat.f_blocks - stat.f_bfree) * stat.f_frsize / (1024.0f * 1024.0f * 1024.0f);
+
+    // Round the total_space value
+    disk.total_space = std::round(disk.total_space);
+
+    disk.usage_percent = (disk.total_space > 0) ? (disk.used_space / disk.total_space * 100.0f) : 0.0f;
 
     return disk;
 }
 
 // Function that reads and returns a list of all running processes on a Linux system
-vector<Proc> SystemResourceTracker::getProcessList() {
-    vector<Proc> processes;
+std::vector<Proc> SystemResourceTracker::getProcessList() {
+    std::vector<Proc> processes;
     DIR *dir = opendir("/proc");
     if (!dir) return processes;
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != nullptr) {
         // check if entry is a directory and its name starts with a digit
-        if (entry->d_type == DT_DIR && isdigit(entry->d_name[0])) {
-            string pid = entry->d_name;
-            string statPath = "/proc/" + pid + "/stat";
-            ifstream statFile(statPath);
+        if (entry->d_type == DT_DIR && std::isdigit(entry->d_name[0])) {
+            std::string pid = entry->d_name;
+            std::string statPath = "/proc/" + pid + "/stat";
+            std::ifstream statFile(statPath);
 
             if (statFile.is_open()) {
                 Proc process;
-                process.pid = stoi(pid); //parse pid string to an integer
+                process.pid = std::stoi(pid); //parse pid string to an integer
 
-                string line;
-                getline(statFile, line);
+                std::string line;
+                std::getline(statFile, line);
 
                 size_t nameStart = line.find('(');
                 size_t nameEnd = line.rfind(')');
 
                 // extracts the process name between the parentheses
-                if (nameStart != string::npos && nameEnd != string::npos) {
+                if (nameStart != std::string::npos && nameEnd != std::string::npos) {
                     process.name = line.substr(nameStart + 1, nameEnd - nameStart - 1);
 
                     // create an input string stream from the remainder of the line after the closing parenthesis
-                    istringstream iss(line.substr(nameEnd + 1));
-                    string field; // variable for temporarily holding each extracted word/token
-                    vector<string> fields;
+                    std::istringstream iss(line.substr(nameEnd + 1));
+                    std::string field; // variable for temporarily holding each extracted word/token
+                    std::vector<std::string> fields;
 
                     while (iss >> field) {
                         fields.push_back(field);
@@ -98,10 +115,10 @@ vector<Proc> SystemResourceTracker::getProcessList() {
 
                     if (fields.size() >= 24) {
                         process.state = fields[0][0];
-                        process.vsize = stoll(fields[20]); //virtual memory size
-                        process.rss = stoll(fields[21]); // resident set size
-                        process.utime = stoll(fields[11]); // user mode CPU time
-                        process.stime = stoll(fields[12]); // kernel mode CPU time
+                        process.vsize = std::stoll(fields[20]); //virtual memory size
+                        process.rss = std::stoll(fields[21]); // resident set size
+                        process.utime = std::stoll(fields[11]); // user mode CPU time
+                        process.stime = std::stoll(fields[12]); // kernel mode CPU time
                     }
 
                     processes.push_back(process);
