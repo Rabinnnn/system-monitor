@@ -338,12 +338,14 @@ void memoryProcessesWindow(const char* id, ImVec2 size, ImVec2 position) {
             ImGui::TableNextColumn(); ImGui::Text("%c", proc.state);
             ImGui::TableNextColumn();
             float cpuUsage = processTracker.calculateProcessCPUUsage(proc, currentTime);
-            ImGui::Text("%.2f%%", cpuUsage);
+            ImGui::Text("%.1f%%", cpuUsage);
             ImGui::TableNextColumn();
             // Convert vsize to GB for consistency
             float memUsageGB = proc.vsize / (1024.0f * 1024.0f * 1024.0f);
-            float memPercent = (memInfo.total_ram > 0) ? (memUsageGB / memInfo.total_ram * 100.0f) : 0.0f;
-            ImGui::Text("%.2f%% (%.1f GB)", memPercent, memUsageGB);
+            // float memPercent = (memInfo.total_ram > 0) ? (memUsageGB / memInfo.total_ram * 100.0f) : 0.0f;
+            // ImGui::Text("%.1f%% (%.1f GB)", memPercent, memUsageGB);
+            ImGui::Text("%.1f%%",  memUsageGB);
+
         }
         ImGui::EndTable();
     }

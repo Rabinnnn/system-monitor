@@ -307,7 +307,7 @@ float CPUUsageTracker::getCurrentUsage() { return currentUsage; }
 // - updateInterval 
 // - lastUpdateTime stores the time of the last update
 ProcessUsageTracker::ProcessUsageTracker()
-    : deltaTime(0.0f), updateInterval(1.0f), lastUpdateTime(0.0f) {}
+    : deltaTime(0.0f), updateInterval(3.0f), lastUpdateTime(0.0f) {}
 
 void ProcessUsageTracker::updateDeltaTime(float dt) {
     deltaTime += dt; // Accumulate time since last major update
@@ -323,52 +323,49 @@ float ProcessUsageTracker::calculateProcessCPUUsage(const Proc& process, float c
         return (it != cpuUsageCache.end()) ? it->second : 0.0f;
     }
 
-    // Get number of CPU cores
-    int numCores = sysconf(_SC_NPROCESSORS_ONLN);
-    if (numCores <= 0) numCores = 1; // Fallback to 1 core if detection fails
-
-    // Get total system CPU time
-    long long totalTime = 0;
-    ifstream statFile("/proc/stat");
-    if (statFile.is_open()) {
-        string line;
-        getline(statFile, line);
-
-        long long user, nice, system, idle, iowait, irq, softirq, steal;
-        sscanf(line.c_str(), "cpu %lld %lld %lld %lld %lld %lld %lld %lld",
-               &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal);
-
-        totalTime = user + nice + system + idle + iowait + irq + softirq + steal;
+    // Get the system clock tick rate (jiffies per second).
+    // This is crucial for converting the raw jiffy values from /proc into a time in seconds.
+    static const long ticksPerSecond = sysconf(_SC_CLK_TCK);
+    if (ticksPerSecond <= 0) {
+        // Handle error case where clock tick rate cannot be determined.
+        return 0.0f;
     }
 
-    // Calculate process CPU time (including children if available)
-    long long processCPUTime = process.utime + process.stime; // Add process.cutime + process.cstime if available
+
+    // Calculate process CPU time using utime and stime
+    long long processCPUTime = process.utime + process.stime;
+
+    // Get the wall clock time delta. This is the 'T' in 'top's calculation (CPU_TIME_DELTA / T).
+    float timeDeltaInSeconds = currentTime - lastUpdateTime;
 
     // If this is the first time we've seen this process
     if (lastProcessCPUTime.find(process.pid) == lastProcessCPUTime.end()) {
-        lastProcessCPUTime[process.pid] = {processCPUTime, totalTime};
+        // store just the process CPU time, as total system time isn't needed.
+        // The original map was a pair, so we'll just use the 'first' element of the pair
+        // to match the original declaration and avoid errors.
+        lastProcessCPUTime[process.pid].first = processCPUTime;
+        // The second element is not used but is part of the pair.
+        lastProcessCPUTime[process.pid].second = 0;
         cpuUsageCache[process.pid] = 0.0f;
         lastUpdateTime = currentTime;
         return 0.0f;
     }
 
     // Calculate deltas
-    auto [lastProcTime, lastTotalTime] = lastProcessCPUTime[process.pid];
+    long long lastProcTime = lastProcessCPUTime[process.pid].first;
     long long procTimeDelta = processCPUTime - lastProcTime;
-    long long totalTimeDelta = totalTime - lastTotalTime;
 
     // Calculate CPU usage percentage
     float cpuUsage = 0.0f;
-    if (totalTimeDelta > 0 && procTimeDelta >= 0) {
-        // Normalize to per-core usage and scale by number of cores (like top)
-        cpuUsage = (float)procTimeDelta * 100.0f / totalTimeDelta * numCores;
-        // Cap at 100% per core * number of cores
-        cpuUsage = min(cpuUsage, 100.0f * numCores);
+    // Avoid division by zero and ensure positive time delta.
+    if (timeDeltaInSeconds > 0) {
+        // (CPU time delta in jiffies / (wall clock time delta in seconds * ticks per second)) * 100
+        cpuUsage = (static_cast<float>(procTimeDelta) / (timeDeltaInSeconds * ticksPerSecond)) * 100.0f;
     }
 
     // Update cache and last values
     cpuUsageCache[process.pid] = cpuUsage;
-    lastProcessCPUTime[process.pid] = {processCPUTime, totalTime};
+    lastProcessCPUTime[process.pid].first = processCPUTime;
     lastUpdateTime = currentTime;
 
     return cpuUsage;
