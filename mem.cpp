@@ -68,8 +68,9 @@ DiskInfo SystemResourceTracker::getDiskInfo() {
     disk.total_space = static_cast<float>(stat.f_blocks) * stat.f_frsize / (1024.0f * 1024.0f * 1024.0f);
     disk.used_space = static_cast<float>(stat.f_blocks - stat.f_bfree) * stat.f_frsize / (1024.0f * 1024.0f * 1024.0f);
 
-    // Round the total_space value
+    // Round off the values
     disk.total_space = std::round(disk.total_space);
+    disk.used_space = std::round(disk.used_space);
 
     disk.usage_percent = (disk.total_space > 0) ? (disk.used_space / disk.total_space * 100.0f) : 0.0f;
 
