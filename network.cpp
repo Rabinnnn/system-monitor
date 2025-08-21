@@ -32,7 +32,7 @@ Networks NetworkTracker::getNetworkInterfaces() {
     }
 
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) { // Check if the interface has an IPv4 address
+        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) { // Check if the interface has an IPv4 address (AF_NET) and has an active IP assigned to it (ifa-> ifa_addr)
             struct sockaddr_in *addr = (struct sockaddr_in*)ifa->ifa_addr;
             
             // extract the IPv4 address and name
