@@ -10,8 +10,8 @@ string formatNetworkBytes(long long bytes) {
     int unitIndex = 0;
     double value = bytes;
 
-    while (value >= 1024 && unitIndex < 4) {
-        value /= 1024;
+    while (value >= 1000 && unitIndex < 4) {
+        value /= 1000;
         unitIndex++;
     }
 
