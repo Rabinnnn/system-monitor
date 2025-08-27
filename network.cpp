@@ -24,29 +24,45 @@ string formatNetworkBytes(long long bytes) {
 // Function that retrieves IPV4 network interfaces
 Networks NetworkTracker::getNetworkInterfaces() {
     Networks nets;
-    struct ifaddrs *ifap, *ifa; // ifap holds the start of the linked list
-                                // of interfaces while ifa is an iterator for traversing the list.
-    
-    if (getifaddrs(&ifap) == -1) { // getifaddrs populates ifap with a linked list of network interfaces. If it fails return the empty nets
+    struct ifaddrs *ifap, *ifa;
+
+    if (getifaddrs(&ifap) == -1) {
         return nets;
     }
 
+    std::map<std::string, IP4> ifaceMap; // to deduplicate by name
+
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) { // Check if the interface has an IPv4 address (AF_NET) and has an active IP assigned to it (ifa-> ifa_addr)
-            struct sockaddr_in *addr = (struct sockaddr_in*)ifa->ifa_addr;
-            
-            // extract the IPv4 address and name
+        if (!ifa->ifa_name) continue;
+
+        std::string name = ifa->ifa_name;
+        auto it = ifaceMap.find(name);
+
+        // If not seen before, create entry with N/A
+        if (it == ifaceMap.end()) {
             IP4 interface;
-            interface.name = strdup(ifa->ifa_name);
-            inet_ntop(AF_INET, &(addr->sin_addr), interface.addressBuffer, INET_ADDRSTRLEN);
-            
-            nets.ip4s.push_back(interface); // add the interface to the list of IPv4 interfaces
+            interface.name = strdup(name.c_str());
+            strncpy(interface.addressBuffer, "N/A", INET_ADDRSTRLEN);
+            ifaceMap[name] = interface;
+        }
+
+        // If this entry has IPv4, update address
+        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
+            struct sockaddr_in *addr = (struct sockaddr_in*)ifa->ifa_addr;
+            inet_ntop(AF_INET, &(addr->sin_addr), ifaceMap[name].addressBuffer, INET_ADDRSTRLEN);
         }
     }
 
-    freeifaddrs(ifap); // free the memory allocated by getifaddrs
+    // Move deduplicated interfaces into final vector
+    for (auto &kv : ifaceMap) {
+        nets.ip4s.push_back(kv.second);   
+    }
+
+    freeifaddrs(ifap);
     return nets;
 }
+
+
 
 // Function that reads network receive (RX) statistics from /proc/net/dev and
 // returns them in a map<string, RX>, where each key is a network interface name (e.g "eth0" or "wlan0")

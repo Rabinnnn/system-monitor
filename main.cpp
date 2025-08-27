@@ -362,9 +362,17 @@ void networkWindow(const char* id, ImVec2 size, ImVec2 position) {
 
     NetworkTracker networkTracker;
     Networks interfaces = networkTracker.getNetworkInterfaces();
+
     ImGui::Text("Network Interfaces:");
+    ImGui::Separator();
+
     for (const auto& iface : interfaces.ip4s) {
-        ImGui::Text("%s: %s", iface.name, iface.addressBuffer);
+        // Display interface name as a bold label
+        ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "%s", iface.name);
+
+        // Indent the address under it
+        ImGui::SameLine(200); // Align address to column 2
+        ImGui::Text("%s", iface.addressBuffer);
     }
 
     // start tabbed interface

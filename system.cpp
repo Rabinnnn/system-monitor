@@ -162,7 +162,7 @@ float getCPUTemperature() {
         }
     }
 
-      // Method 3: Try to find any CPU-related thermal zone
+    // Method 3: Try to find any CPU-related thermal zone
     DIR* thermalDir = opendir("/sys/class/thermal");
     if (thermalDir) {
         struct dirent* entry;
@@ -259,9 +259,9 @@ float getFanSpeed() {
 }
 
 // Destructor for class Networks
-Networks::~Networks() {
-    for (auto& ip : ip4s) free(ip.name); // free memory allocated for ip.name
-}
+// Networks::~Networks() {
+//     for (auto& ip : ip4s) free(ip.name); // free memory allocated for ip.name
+// }
 
 // Constructor for CPUUsageTracker class
 CPUUsageTracker::CPUUsageTracker() : lastStats{0}, currentUsage(0.0f) {}

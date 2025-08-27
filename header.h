@@ -71,11 +71,19 @@ struct IP4
     char addressBuffer[INET_ADDRSTRLEN];
 };
 
-struct Networks
-{
-    vector<IP4> ip4s;
-    ~Networks();
+// struct Networks
+// {
+//     vector<IP4> ip4s;
+//     ~Networks();
 
+// };
+struct Networks {
+    std::vector<IP4> ip4s;
+    ~Networks() {
+        for (auto& ip4 : ip4s) {
+            free(ip4.name);
+        }
+    }
 };
 
 struct RX
